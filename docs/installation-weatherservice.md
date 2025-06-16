@@ -8,7 +8,11 @@ title: Installation: Configuring weather service
 > Previous: [Downloading the integration](installation-download.md)<br/>
 > Next: [Configuration](configuration.md) or [Changing your settings for weather service](installation-options.md)
 
-The installation wizard allows you to determine if you want to use a weather service and if so, which one. If you decide to use a weather service, it will also ask you for the API key. See below for instructions on how to get an API key for Open Weather Map or Pirate Weather.
+The installation wizard allows you to determine if you want to use a weather service and if so, which one. If you decide to use a weather service, it will also ask you for the API key. See below for instructions on how to get an API key for Open Weather Map, Pirate Weather, or KNMI.
+
+## 🇳🇱 KNMI Weather Service (Enhanced for Netherlands)
+
+**For users in the Netherlands**: KNMI weather service provides enhanced evapotranspiration accuracy through professional-grade Makkink calculations from the Royal Netherlands Meteorological Institute. This enhancement automatically provides superior irrigation calculations with intelligent fallback to proven PyETO methods. [Learn more about KNMI Makkink Enhancement →](knmi-makkink-enhancement.html)
 
 Let's walk through the wizard: 
 1. The first page here allows you to disable or enable the use of a weather service. If you disable this option and click `Submit` you will not be able to use forecasting in your [calculation modules](configuration-modules.md). If you enable this and click `Submit`, the next screen will allow you to set up the weather service you want to use. If you use a weather service, make sure your Home Assistant home zone coordinates are set correctly so the data is correct. This is especially true if you set the coordinates manually in the configuration.yaml. Although we recommend using a weather service by providing an free API key, you _can_ skip it. Skipping it, however, disables any ability to forecast. If it is disabled you need to use another source, such as your own weather station, exclusively. If you turn it off, you will not be able to use forecasts. If you intent to use a weather service for at least part of the weather data, including forecasting, leave this option on.
@@ -32,9 +36,21 @@ Go to [OpenWeatherMap](https://openweathermap.org) and create an account. You ca
 ## Getting Pirate Weather API key
 Follow the instructions on this page (see `API Key` section): https://docs.pirateweather.net/en/latest/API/.
 
-## Getting KNMI Data Platform API key
+## Getting KNMI Data Platform API key 🇳🇱
 
-Go to [KNMI Data Platform](https://dataplatform.knmi.nl) and create an account. Once logged in, go to API Management and generate a new API key. The KNMI Data Platform provides free access to Dutch weather data including current observations and HARMONIE-AROME forecast model data. This service is particularly useful for users in the Netherlands and surrounding areas.
+Go to [KNMI Data Platform](https://dataplatform.knmi.nl) and create an account. Once logged in, go to API Management and generate a new API key. The KNMI Data Platform provides free access to Dutch weather data including:
+
+- **Current weather observations** from KNMI's extensive weather station network
+- **Enhanced Makkink evapotranspiration** data (EV24 dataset) for superior irrigation accuracy in Netherlands
+- **HARMONIE-AROME forecast** model data for weather predictions
+
+**Benefits for Netherlands users:**
+
+- Professional-grade evapotranspiration calculations calibrated for Dutch climate
+- Automatic enhancement with intelligent PyETO fallback
+- No additional cost - included with standard KNMI Data Platform access
+
+[Learn more about KNMI Makkink Enhancement →](knmi-makkink-enhancement.html)
 
 > Main page: [Installation](installation.md)<br/>
 > Previous: [Downloading the integration](installation-download.md)<br/>

@@ -6,6 +6,8 @@
   name: Configuration
 - link: how-it-works.html
   name: How it works
+- link: knmi-makkink-enhancement.html
+  name: KNMI Makkink Enhancement
 - link: usage.html
   name: Usage
 - link: help.html

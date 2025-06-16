@@ -15,6 +15,17 @@ If it rains or snows less than the amount of moisture lost, then irrigation is r
 The integration can take into account weather forecasts for the coming days and also keeps track of the total moisture lost or added ('bucket').
 Multiple zones are supported with each zone having it own configuration and set up.
 
+## 🇳🇱 Enhanced for Netherlands Users
+
+**Smart Irrigation now provides enhanced evapotranspiration accuracy for Netherlands users** through professional-grade [Makkink calculations](knmi-makkink-enhancement.html) from the Royal Netherlands Meteorological Institute (KNMI). This enhancement automatically provides superior irrigation calculations while maintaining full backward compatibility.
+
+- **Enhanced Accuracy**: Climate-specific calculations calibrated for Dutch conditions
+- **Professional Grade**: Uses the same data Dutch agricultural professionals rely on  
+- **Zero Configuration**: Automatic enhancement with intelligent PyETO fallback
+- **Location Specific**: High-resolution gridded data for precise calculations
+
+[Learn more about KNMI Makkink Enhancement →](knmi-makkink-enhancement.html)
+
 Note that this integration does not control your irrigation system - it merely calculates durations and you are expected to build an [automation](https://jeroenterheerdt.github.io/HAsmartirrigation/usage-automations.html) to interact with your irrigation system.
 
 > **Note - use this integration at your own risk - we do not assume responsibility for any inconvience caused by using this integration. Always use common sense before deciding to irrigate using the calculations this integration provides. For example, irrigating during excessive rainfall might cause flooding. Again - we assume no responsibility for any inconvience caused.**

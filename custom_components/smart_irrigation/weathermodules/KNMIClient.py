@@ -12,6 +12,7 @@ import requests
 from ..const import (  # noqa: TID252
     MAPPING_CURRENT_PRECIPITATION,
     MAPPING_DEWPOINT,
+    MAPPING_EVAPOTRANSPIRATION,
     MAPPING_HUMIDITY,
     MAPPING_PRECIPITATION,
     MAPPING_PRESSURE,
@@ -29,6 +30,9 @@ KNMI_LOCATIONS_URL = (
     "https://api.dataplatform.knmi.nl/edr/v1/collections/observations/locations"
 )
 KNMI_FORECAST_URL = "https://api.dataplatform.knmi.nl/edr/v1/collections/harmonie_arome_cy43_p1/position"
+KNMI_EV24_URL = (
+    "https://api.dataplatform.knmi.nl/edr/v1/collections/EV24/cube"
+)
 
 RETRY_TIMES = 3
 
@@ -40,6 +44,7 @@ KNMI_temp_key_name = "t_dryb_10"  # Air temperature in Celsius
 KNMI_dew_point_key_name = "t_dewp_10"  # Dew point temperature in Celsius
 KNMI_precip_key_name = "ri_regenm_10"  # Precipitation intensity in mm/h (10-minute average)
 KNMI_precip_duration_key_name = "dr_regenm_10"  # Precipitation duration in seconds (within 10-minute period)
+KNMI_evapotranspiration_key_name = "evaporation"  # Makkink evapotranspiration in kg m-2 (equivalent to mm)
 
 # For forecast data - using gridded collections
 KNMI_max_temp_key_name = "tx_dryb_10"  # Maximum temperature
@@ -282,6 +287,19 @@ class KNMIClient:  # pylint: disable=invalid-name
                     # Daily precipitation - get sum from last 24 hours
                     parsed_data[MAPPING_PRECIPITATION] = self._get_daily_precipitation()
 
+                    # Daily Makkink evapotranspiration from EV24 dataset (enhanced for Dutch users)
+                    makkink_et = self._get_daily_makkink_evapotranspiration()
+                    if makkink_et is not None:
+                        parsed_data[MAPPING_EVAPOTRANSPIRATION] = makkink_et
+                        _LOGGER.info(
+                            "Using KNMI Makkink evapotranspiration: %s mm (enhanced accuracy for Netherlands)",
+                            makkink_et,
+                        )
+                    else:
+                        _LOGGER.debug(
+                            "Makkink evapotranspiration not available, Smart Irrigation will use PyETO calculations"
+                        )
+
                     _LOGGER.debug(
                         "KNMIClient daily precipitation: %s",
                         parsed_data[MAPPING_PRECIPITATION],
@@ -412,6 +430,61 @@ class KNMIClient:  # pylint: disable=invalid-name
             _LOGGER.debug("Could not get daily precipitation: %s", ex)
 
         return 0.0
+
+    def _get_daily_makkink_evapotranspiration(self):
+        """Get daily Makkink evapotranspiration from KNMI EV24 dataset.
+        
+        Returns:
+            Daily Makkink evapotranspiration in mm, or None if unavailable.
+        """
+        # Ensure station is initialized before making API calls
+        self._ensure_station_initialized()
+        
+        try:
+            # Get yesterday's evapotranspiration data since today's data may not be available yet
+            # KNMI EV24 has a processing delay
+            end_date = datetime.datetime.now() - datetime.timedelta(days=1)
+            start_date = end_date
+            
+            # Format as date-only for daily data (EV24 provides daily values)
+            datetime_param = f"{start_date.strftime('%Y-%m-%d')}"
+
+            params = {
+                "coords": self.coords,
+                "datetime": datetime_param,
+                "parameter-name": KNMI_evapotranspiration_key_name,
+                "f": "CoverageJSON",
+            }
+
+            req = requests.get(
+                KNMI_EV24_URL, headers=self.headers, params=params, timeout=30
+            )
+
+            if req.status_code == 200:
+                doc = json.loads(req.text)
+                if "ranges" in doc and KNMI_evapotranspiration_key_name in doc["ranges"]:
+                    values = doc["ranges"][KNMI_evapotranspiration_key_name].get("values", [])
+                    if values and len(values) > 0:
+                        # EV24 provides daily evapotranspiration in kg m-2, which is equivalent to mm
+                        # Return the most recent value (should be only one for daily data)
+                        et_value = values[-1] if isinstance(values, list) else values
+                        if et_value is not None and et_value >= 0:
+                            _LOGGER.debug(
+                                "Retrieved Makkink evapotranspiration: %s mm for date %s",
+                                et_value,
+                                datetime_param,
+                            )
+                            return float(et_value)
+
+            _LOGGER.debug(
+                "Could not get Makkink evapotranspiration data from EV24 API. Status: %s",
+                req.status_code,
+            )
+
+        except Exception as ex:
+            _LOGGER.debug("Could not get Makkink evapotranspiration: %s", ex)
+
+        return None
 
     def _safe_average(self, data_dict, key):
         """Safely calculate average of values for a key."""
