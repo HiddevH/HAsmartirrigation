@@ -73,7 +73,8 @@
           "labels": {
             "auto-update-enabled": "Actualizar automáticamente los datos meteorológicos",
             "auto-update-first-update": "(Primer) Actualización a las",
-            "auto-update-interval": "Actualizar datos del sensor cada"
+            "auto-update-interval": "Actualizar datos del sensor cada",
+            "auto-update-first-time": "Hora de actualización diaria"
           },
           "options": {
             "days": "días",

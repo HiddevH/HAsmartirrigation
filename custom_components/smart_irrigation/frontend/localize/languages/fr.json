@@ -75,7 +75,8 @@
             "auto-update-enabled": "Met à jour les données météo automatiquement",
             "auto-update-first-update": "(Première) Mise à jour à",
             "auto-update-interval": "Mettre à jour les données des capteurs toutes les",
-            "auto-update-delay": "Délai de mise à jour"
+            "auto-update-delay": "Délai de mise à jour",
+            "auto-update-first-time": "Heure de mise à jour quotidienne"
           },
           "options": {
             "days": "jours",

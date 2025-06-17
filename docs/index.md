@@ -23,8 +23,11 @@ Multiple zones are supported with each zone having it own configuration and set 
 - **Professional Grade**: Uses the same data Dutch agricultural professionals rely on  
 - **Zero Configuration**: Automatic enhancement with intelligent PyETO fallback
 - **Location Specific**: High-resolution gridded data for precise calculations
+- **⚠️ Timing Optimization**: Change calculation time from default 23:00 to 06:00 for optimal Makkink data usage
 
 [Learn more about KNMI Makkink Enhancement →](knmi-makkink-enhancement.html)
+
+**Note**: Smart Irrigation weather updates begin immediately upon restart and repeat at configured intervals. For optimal timing with daily updates, restart the integration at your preferred update start time.
 
 Note that this integration does not control your irrigation system - it merely calculates durations and you are expected to build an [automation](https://jeroenterheerdt.github.io/HAsmartirrigation/usage-automations.html) to interact with your irrigation system.
 

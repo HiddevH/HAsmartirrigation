@@ -75,7 +75,8 @@
           "labels": {
             "auto-update-enabled": "Automatisches Update der Wetterdaten",
             "auto-update-delay": "Update Verzögerung",
-            "auto-update-interval": "Update der Sensordaten alle"
+            "auto-update-interval": "Update der Sensordaten alle",
+            "auto-update-first-time": "Tägliche Update-Zeit"
           },
           "options": {
             "days": "Tage",

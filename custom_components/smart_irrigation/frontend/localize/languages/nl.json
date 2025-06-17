@@ -75,7 +75,8 @@
           "labels": {
             "auto-update-enabled": "Automatisch weersinformatie bijwerken",
             "auto-update-delay": "Vertraging",
-            "auto-update-interval": "Sensor data bijwerken elke"
+            "auto-update-interval": "Sensor data bijwerken elke",
+            "auto-update-first-time": "Dagelijkse update tijd"
           },
           "options": {
             "days": "dagen",

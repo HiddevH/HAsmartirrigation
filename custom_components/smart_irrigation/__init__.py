@@ -818,32 +818,55 @@ class SmartIrrigationCoordinator(DataUpdateCoordinator):
         """Track and schedule periodic updates for Smart Irrigation based on configuration."""
         # perform update once
         self.hass.async_create_task(self._async_update_all())
-        # use async_track_time_interval
+        # use async_track_time_interval or async_track_time_at based on schedule
         data = await self.store.async_get_config()
         the_time_delta = None
         interval = int(data[const.CONF_AUTO_UPDATE_INTERVAL])
+        
+        if self._track_auto_update_time_unsub:
+            self._track_auto_update_time_unsub()
+            self._track_auto_update_time_unsub = None
+            
         if data[const.CONF_AUTO_UPDATE_SCHEDULE] == const.CONF_AUTO_UPDATE_DAILY:
-            # track time X days
-            the_time_delta = timedelta(days=interval)
+            # For daily updates, use time-based scheduling if configured
+            update_time = data.get(const.CONF_AUTO_UPDATE_TIME, const.CONF_DEFAULT_AUTO_UPDATE_TIME)
+            if interval == 1 and update_time:
+                # Use async_track_time_at for daily updates at specific time
+                from homeassistant.helpers.event import async_track_time_change
+                try:
+                    hour, minute = map(int, update_time.split(':'))
+                    self._track_auto_update_time_unsub = async_track_time_change(
+                        self.hass, self._async_update_all, hour=hour, minute=minute, second=0
+                    )
+                    _LOGGER.info("Scheduled daily auto update at %s", update_time)
+                except (ValueError, AttributeError):
+                    # Fallback to interval-based scheduling
+                    _LOGGER.warning("Invalid update time format '%s', using interval scheduling", update_time)
+                    the_time_delta = timedelta(days=interval)
+            else:
+                # Multi-day intervals use interval scheduling
+                the_time_delta = timedelta(days=interval)
         elif data[const.CONF_AUTO_UPDATE_SCHEDULE] == const.CONF_AUTO_UPDATE_HOURLY:
             # track time X hours
             the_time_delta = timedelta(hours=interval)
         elif data[const.CONF_AUTO_UPDATE_SCHEDULE] == const.CONF_AUTO_UPDATE_MINUTELY:
             # track time X minutes
             the_time_delta = timedelta(minutes=interval)
-        # update cache for OWMClient to time delta in seconds -1
-        if self._WeatherServiceClient:
-            self._WeatherServiceClient.cache_seconds = (
-                the_time_delta.total_seconds() - 1
+            
+        # If we still need interval-based scheduling
+        if the_time_delta and not self._track_auto_update_time_unsub:
+            # update cache for OWMClient to time delta in seconds -1
+            if self._WeatherServiceClient:
+                self._WeatherServiceClient.cache_seconds = (
+                    the_time_delta.total_seconds() - 1
+                )
+            self._track_auto_update_time_unsub = async_track_time_interval(
+                self.hass, self._async_update_all, the_time_delta
             )
-
-        if self._track_auto_update_time_unsub:
-            self._track_auto_update_time_unsub()
-            self._track_auto_update_time_unsub = None
-        self._track_auto_update_time_unsub = async_track_time_interval(
-            self.hass, self._async_update_all, the_time_delta
-        )
-        _LOGGER.info("Scheduled auto update time interval for each %s", the_time_delta)
+            _LOGGER.info("Scheduled auto update time interval for each %s", the_time_delta)
+        elif self._WeatherServiceClient and data[const.CONF_AUTO_UPDATE_SCHEDULE] == const.CONF_AUTO_UPDATE_DAILY:
+            # For daily time-based updates, set cache to 23 hours
+            self._WeatherServiceClient.cache_seconds = 23 * 3600
 
     async def _get_unique_mappings_for_automatic_zones(self, zones):
         mappings = [
@@ -1442,6 +1465,11 @@ class SmartIrrigationCoordinator(DataUpdateCoordinator):
             if m[const.MODULE_NAME] == "PyETO":
                 # pyeto expects pressure in hpa, solar radiation in mj/m2/day and wind speed in m/s
 
+                delta = modinst.calculate(
+                    weather_data=weatherdata, forecast_data=forecastdata
+                )
+            elif m[const.MODULE_NAME] == "KNMI":
+                # KNMI module uses Makkink ET with PyETO fallback
                 delta = modinst.calculate(
                     weather_data=weatherdata, forecast_data=forecastdata
                 )

@@ -76,7 +76,8 @@
           "labels": {
             "auto-update-enabled": "Automaticky aktualizovať údaje o počasí",
             "auto-update-delay": "Oneskorenie aktualizácie",
-            "auto-update-interval": "Aktualizujte údaje snímača každý"
+            "auto-update-interval": "Aktualizujte údaje snímača každý",
+            "auto-update-first-time": "Čas dennej aktualizácie"
           },
           "options": {
             "days": "dni",

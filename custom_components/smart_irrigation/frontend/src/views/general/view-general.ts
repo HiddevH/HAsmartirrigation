@@ -307,8 +307,7 @@ export class SmartIrrigationViewGeneral extends SubscribeMixin(LitElement) {
                 this.hass.language,
               )}
               (s):</label
-            >
-            <input
+            >            <input
               id="updatedelay"
               type="text"
               class="shortinput"
@@ -321,14 +320,31 @@ export class SmartIrrigationViewGeneral extends SubscribeMixin(LitElement) {
                 });
               }}
             />
-          </div>`;
-      }
-
-      r2 = html`<ha-card header="${localize(
+          </div>
+          ${this.data.autoupdateschedule === AUTO_UPDATE_SCHEDULE_DAILY && this.data.autoupdateinterval === 1 ? html`
+          <div class="card-content">
+            <label for="updatefirsttime"
+              >${localize(
+                "panels.general.cards.automatic-update.labels.auto-update-first-time",
+                this.hass.language,
+              )}:</label
+            >
+            <input
+              id="updatefirsttime"
+              type="time"
+              class="shortinput"
+              .value="${this.data.autoupdatefirsttime || '05:00'}"
+              @input=${(e: Event) => {
+              this.saveData({
+                autoupdatefirsttime: (e.target as HTMLInputElement).value,
+              });
+            }}
+            />
+          </div>` : ''}`;
+      } r2 = html`<ha-card header="${localize(
         "panels.general.cards.automatic-update.header",
         this.hass.language,
-      )}",
-      this.hass.language)}">${r2}</ha-card>`;
+      )}">${r2}</ha-card>`;
 
       let r3 = html` <div class="card-content">
           <svg
@@ -539,21 +555,18 @@ export class SmartIrrigationViewGeneral extends SubscribeMixin(LitElement) {
     this.data = {
       ...this.data,
       ...changes,
-    };
-    saveConfig(this.hass, this.data)
+    }; saveConfig(this.hass, this.data)
       .catch((e) =>
         handleError(
           e,
-          this.shadowRoot!.querySelector("ha-card") as HTMLElement,
+          (this as any).renderRoot?.querySelector("ha-card") as HTMLElement || document.createElement("div"),
         ),
       )
       .then();
-  }
+  } toggleInformation(item: string) {
+    const el = (this as any).renderRoot?.querySelector("#" + item);
 
-  toggleInformation(item: string) {
-    const el = this.shadowRoot?.querySelector("#" + item);
-
-    //const bt = this.shadowRoot?.querySelector("#showcalcresults" + index);
+    //const bt = this.renderRoot?.querySelector("#showcalcresults" + index);
     //if (!el || !bt) {
     if (!el) {
       return;

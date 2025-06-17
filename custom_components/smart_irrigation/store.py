@@ -16,12 +16,14 @@ from .const import (ATTR_NEW_BUCKET_VALUE, ATTR_NEW_MULTIPLIER_VALUE,
                     CONF_AUTO_CALC_ENABLED, CONF_AUTO_CLEAR_ENABLED,
                     CONF_AUTO_UPDATE_DELAY, CONF_AUTO_UPDATE_ENABLED,
                     CONF_AUTO_UPDATE_INTERVAL, CONF_AUTO_UPDATE_SCHEDULE,
-                    CONF_CALC_TIME, CONF_CLEAR_TIME, CONF_CONTINUOUS_UPDATES,
+                    CONF_AUTO_UPDATE_TIME, CONF_CALC_TIME, CONF_CLEAR_TIME, 
+                    CONF_CONTINUOUS_UPDATES,
                     CONF_DEFAULT_AUTO_CALC_ENABLED,
                     CONF_DEFAULT_AUTO_CLEAR_ENABLED,
                     CONF_DEFAULT_AUTO_UPDATE_DELAY,
                     CONF_DEFAULT_AUTO_UPDATE_INTERVAL,
                     CONF_DEFAULT_AUTO_UPDATE_SCHEDULE,
+                    CONF_DEFAULT_AUTO_UPDATE_TIME,
                     CONF_DEFAULT_AUTO_UPDATED_ENABLED, CONF_DEFAULT_CALC_TIME,
                     CONF_DEFAULT_CLEAR_TIME, CONF_DEFAULT_CONTINUOUS_UPDATES,
                     CONF_DEFAULT_DRAINAGE_RATE, CONF_DEFAULT_MAXIMUM_BUCKET,
@@ -122,6 +124,7 @@ class Config:
     autocalcenabled = attr.ib(type=bool, default=CONF_AUTO_CALC_ENABLED)
     autoupdateenabled = attr.ib(type=bool, default=CONF_AUTO_UPDATE_ENABLED)
     autoupdateschedule = attr.ib(type=str, default=CONF_DEFAULT_AUTO_UPDATE_SCHEDULE)
+    autoupdatefirsttime = attr.ib(type=str, default=CONF_DEFAULT_AUTO_UPDATE_TIME)
     autoupdatedelay = attr.ib(type=str, default=CONF_DEFAULT_AUTO_UPDATE_DELAY)
     autoupdateinterval = attr.ib(type=str, default=CONF_DEFAULT_AUTO_UPDATE_INTERVAL)
     autoclearenabled = attr.ib(type=bool, default=CONF_DEFAULT_AUTO_CLEAR_ENABLED)
@@ -182,6 +185,7 @@ class SmartIrrigationStorage:
             autocalcenabled=CONF_DEFAULT_AUTO_CALC_ENABLED,
             autoupdateenabled=CONF_DEFAULT_AUTO_UPDATED_ENABLED,
             autoupdateschedule=CONF_DEFAULT_AUTO_UPDATE_SCHEDULE,
+            autoupdatefirsttime=CONF_DEFAULT_AUTO_UPDATE_TIME,
             autoupdatedelay=CONF_DEFAULT_AUTO_UPDATE_DELAY,
             autoupdateinterval=CONF_DEFAULT_AUTO_UPDATE_INTERVAL,
             autoclearenabled=CONF_DEFAULT_AUTO_CLEAR_ENABLED,
@@ -219,6 +223,9 @@ class SmartIrrigationStorage:
                 ),
                 autoupdateschedule=data["config"].get(
                     CONF_AUTO_UPDATE_SCHEDULE, CONF_DEFAULT_AUTO_UPDATE_SCHEDULE
+                ),
+                autoupdatefirsttime=data["config"].get(
+                    CONF_AUTO_UPDATE_TIME, CONF_DEFAULT_AUTO_UPDATE_TIME
                 ),
                 autoupdatedelay=data["config"].get(
                     CONF_AUTO_UPDATE_DELAY, CONF_DEFAULT_AUTO_UPDATE_DELAY

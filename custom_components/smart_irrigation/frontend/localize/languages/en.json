@@ -86,7 +86,8 @@
           "labels": {
             "auto-update-enabled": "Automatically update weather data",
             "auto-update-delay": "Update delay",
-            "auto-update-interval": "Update sensor data every"
+            "auto-update-interval": "Update sensor data every",
+            "auto-update-first-time": "Daily update time"
           },
           "options": {
             "days": "days",

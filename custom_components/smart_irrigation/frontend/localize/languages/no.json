@@ -73,7 +73,8 @@
           "labels": {
             "auto-update-enabled": "Oppdater værdata automatisk",
             "auto-update-first-update": "(Første) Oppdatering kl",
-            "auto-update-interval": "Oppdater sensordata hvert"
+            "auto-update-interval": "Oppdater sensordata hvert",
+            "auto-update-first-time": "Daglig oppdateringstid"
           },
           "options": {
             "days": "dager",
