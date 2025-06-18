@@ -52,10 +52,10 @@ MAPPING_WINDSPEED = "Windspeed"
 
 SCHEMA = vol.Schema(
     {
-        vol.Optional(CONF_PYETO_COASTAL, default=DEFAULT_COASTAL): bool,
+        vol.Optional(CONF_PYETO_COASTAL, default=DEFAULT_COASTAL): vol.Coerce(bool),
         vol.Optional(
-            CONF_PYETO_SOLRAD_BEHAVIOR, default=DEFAULT_SOLRAD_BEHAVIOR.value
-        ): vol.In([e.value for e in SOLRAD_behavior]),
+            CONF_PYETO_SOLRAD_BEHAVIOR, default=DEFAULT_SOLRAD_BEHAVIOR
+        ): vol.Coerce(SOLRAD_behavior),
         vol.Optional(CONF_PYETO_FORECAST_DAYS, default=DEFAULT_FORECAST_DAYS): vol.All(
             vol.Coerce(int), vol.Range(min=0, max=5)
         ),
@@ -86,9 +86,14 @@ class KNMI(SmartIrrigationCalculationModule):
         self._latitude = hass.config.latitude if hass else 52.3676  # Default to Amsterdam
         self._elevation = hass.config.elevation if hass else 0
         self._coastal = config.get(CONF_PYETO_COASTAL, DEFAULT_COASTAL)
-        self._solrad_behavior = config.get(
-            CONF_PYETO_SOLRAD_BEHAVIOR, DEFAULT_SOLRAD_BEHAVIOR.value
-        )
+        
+        # Handle solrad_behavior as enum
+        solrad_behavior = config.get(CONF_PYETO_SOLRAD_BEHAVIOR, DEFAULT_SOLRAD_BEHAVIOR)
+        if isinstance(solrad_behavior, SOLRAD_behavior):
+            self._solrad_behavior = solrad_behavior.value
+        else:
+            self._solrad_behavior = solrad_behavior
+            
         self.forecast_days = config.get(CONF_PYETO_FORECAST_DAYS, DEFAULT_FORECAST_DAYS)
 
         if not isinstance(self.forecast_days, int):

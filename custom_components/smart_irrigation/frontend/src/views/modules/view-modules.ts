@@ -116,6 +116,14 @@ class SmartIrrigationViewModules extends SubscribeMixin(LitElement) {
         <ha-card header="${module.id}: ${module.name}">
           <div class="card-content">
             <div class="moduledescription${index}">${module.description}</div>
+            ${module.name === "KNMI" ? html`
+              <div class="knmi-explanation">
+                <strong>How this module works:</strong><br>
+                • <strong>Primary:</strong> Uses KNMI Makkink evapotranspiration data (highly accurate for Netherlands)<br>
+                • <strong>Fallback:</strong> When KNMI data is unavailable, automatically switches to PyETO FAO56 calculations<br>
+                • <strong>Configuration below:</strong> Settings only apply to PyETO fallback calculations
+              </div>
+            ` : ''}
             <div class="moduleconfig">
               <label class="subheader"
                 >${localize(
@@ -164,8 +172,7 @@ class SmartIrrigationViewModules extends SubscribeMixin(LitElement) {
                       .value=${JSON.stringify(module.config)}
                     />
                   </div>`
-                  */
-  renderConfig(index: number, value: string): any {
+                  */  renderConfig(index: number, value: string): any {
     const mod = Object.values(this.modules).at(index);
     if (!mod || !this.hass) {
       return;
@@ -180,10 +187,18 @@ class SmartIrrigationViewModules extends SubscribeMixin(LitElement) {
     }
     if (name in mod.config) {
       val = mod.config[name];
-    }
-    let r = html`<label for="${name + index}"
+                    } let r = html`<label for="${name + index}"
       >${prettyName} </label
-    `;
+    `;// Add configuration description if available
+                    // First try module-specific description, then fall back to generic
+                    const moduleSpecificKey = `panels.modules.cards.module.config-descriptions.${mod.name}.${name}`;
+                    const genericKey = `panels.modules.cards.module.config-descriptions.${name}`; let configDescription = localize(moduleSpecificKey, this.hass.language);
+                    if (configDescription === moduleSpecificKey) {
+                      // Fall back to generic description
+                      configDescription = localize(genericKey, this.hass.language);
+                    }
+                    const hasDescription = configDescription !== genericKey && configDescription !== moduleSpecificKey;
+
     if (schemaline["type"] == "boolean") {
       r = html`${r}<input
           type="checkbox"
@@ -262,8 +277,10 @@ class SmartIrrigationViewModules extends SubscribeMixin(LitElement) {
 
     if (schemaline["required"]) {
       r = html`${r} *`;
-    }
-    r = html`<div class="schemaline">${r}</div>`;
+                    } r = html`<div class="schemaline">
+      ${r}
+      ${hasDescription ? html`<div class="config-description">${configDescription}</div>` : ''}
+    </div>`;
     return r;
   }
 
@@ -330,7 +347,6 @@ class SmartIrrigationViewModules extends SubscribeMixin(LitElement) {
           this.renderModule(value, value["id"])
         )}
         */
-
   static get styles(): CSSResultGroup {
     return css`
       ${commonStyle}
@@ -346,6 +362,23 @@ class SmartIrrigationViewModules extends SubscribeMixin(LitElement) {
       }
       .subheader {
         font-weight: bold;
+      }      .knmi-explanation {
+        background-color: var(--primary-background-color);
+        border: 1px solid var(--primary-color);
+        border-radius: 4px;
+        padding: 12px;
+        margin: 12px 0;
+        font-size: 0.9em;
+        line-height: 1.4;
+        color: var(--primary-text-color);
+      }
+      .config-description {
+        font-size: 0.85em;
+        color: var(--secondary-text-color);
+        font-style: italic;
+        margin-top: 4px;
+        margin-bottom: 8px;
+        line-height: 1.3;
       }
     `;
   }

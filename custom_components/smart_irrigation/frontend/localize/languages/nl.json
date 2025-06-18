@@ -46,13 +46,16 @@
   },
   "calcmodules": {
     "pyeto": {
-      "description": "Bereken duur op basis van de FAU56 formule en de PyETO library"
+      "description": "Bereken duur met de gestandaardiseerde FAO56 Penman-Monteith evapotranspiratie methode uit de PyETO library. Deze methode is wereldwijd toepasbaar en aanbevolen door de VN Voedsel- en Landbouworganisatie voor referentie evapotranspiratie berekeningen."
     },
     "static": {
       "description": "Module met instelbare verandering"
     },
     "passthrough": {
       "description": "Geeft waarde van ET sensor as verandering terug"
+    },
+    "knmi": {
+      "description": "Bereken duur geoptimaliseerd voor Nederland met KNMI Makkink evapotranspiratie gegevens. Biedt zeer nauwkeurige, locatie-specifieke evapotranspiratie berekeningen gebaseerd op officiële Nederlandse meteorologische gegevens van het Koninklijk Nederlands Meteorologisch Instituut (KNMI)."
     }
   },
   "panels": {
@@ -189,7 +192,8 @@
           "translated-options": {
             "DontEstimate": "Niet berekenen",
             "EstimateFromSunHours": "Gebaseerd op zon uren",
-            "EstimateFromTemp": "Gebaseerd op temperatuur"
+            "EstimateFromTemp": "Gebaseerd op temperatuur",
+            "EstimateFromSunHoursAndTemperature": "Gebaseerd op gemiddelde van zon uren en temperatuur"
           }
         }
       },

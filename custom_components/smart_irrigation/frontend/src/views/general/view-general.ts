@@ -63,9 +63,10 @@ export class SmartIrrigationViewGeneral extends SubscribeMixin(LitElement) {
       CONF_AUTO_CLEAR_ENABLED,
       CONF_CLEAR_TIME,
       CONF_CONTINUOUS_UPDATES,
-      CONF_SENSOR_DEBOUNCE,
-    ]);
+      CONF_SENSOR_DEBOUNCE,]);
 
+    console.log('Smart Irrigation Debug - this.data:', this.data);
+    console.log('Smart Irrigation Debug - this.config:', this.config);
     /*Object.entries(this.data).forEach(([key, value]) => console.log(key, value));*/
   }
 
@@ -319,9 +320,7 @@ export class SmartIrrigationViewGeneral extends SubscribeMixin(LitElement) {
                   ),
                 });
               }}
-            />
-          </div>
-          ${this.data.autoupdateschedule === AUTO_UPDATE_SCHEDULE_DAILY && this.data.autoupdateinterval === 1 ? html`
+            />          </div>          ${this.data?.autoupdateschedule === AUTO_UPDATE_SCHEDULE_DAILY ? html`
           <div class="card-content">
             <label for="updatefirsttime"
               >${localize(
@@ -333,7 +332,7 @@ export class SmartIrrigationViewGeneral extends SubscribeMixin(LitElement) {
               id="updatefirsttime"
               type="time"
               class="shortinput"
-              .value="${this.data.autoupdatefirsttime || '05:00'}"
+              value="${this.data.autoupdatefirsttime || '05:00'}"
               @input=${(e: Event) => {
               this.saveData({
                 autoupdatefirsttime: (e.target as HTMLInputElement).value,

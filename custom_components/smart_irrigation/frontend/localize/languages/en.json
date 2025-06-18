@@ -57,13 +57,16 @@
   },
   "calcmodules": {
     "pyeto": {
-      "description": "Calculate duration based on the FAO56 calculation from the PyETO library"
+      "description": "Calculate duration using the standardized FAO56 Penman-Monteith evapotranspiration method from the PyETO library. This method is globally applicable and recommended by the UN Food and Agriculture Organization for reference evapotranspiration calculations."
     },
     "static": {
       "description": "'Dummy' module with a static configurable delta"
     },
     "passthrough": {
       "description": "Passthrough module that returns the value of an Evapotranspiration sensor as delta"
+    },
+    "knmi": {
+      "description": "Calculate duration optimized for the Netherlands using KNMI Makkink evapotranspiration data. Provides highly accurate, location-specific evapotranspiration calculations based on official Dutch meteorological data from the Royal Netherlands Meteorological Institute (KNMI)."
     }
   },
   "panels": {
@@ -208,6 +211,18 @@
           "labels": {
             "configuration": "Configuration",
             "required": "indicates a required field"
+          },
+          "config-descriptions": {
+            "KNMI": {
+              "coastal": "Enable if your location is on or adjacent to coast of a large land mass or where air masses are influenced by a nearby water body. Improves accuracy for coastal areas by adjusting wind speed and humidity calculations.",
+              "solrad_behavior": "Determines how to retrieve or estimate solar radiation data. Choose the method that best matches your available data sources and local conditions.",
+              "forecast_days": "Number of forecast days (0-5) to consider when deciding whether to irrigate. This helps avoid unnecessary watering when rain is predicted. Set to 0 to disable forecast-based irrigation adjustments."
+            },
+            "PyETO": {
+              "coastal": "Enable if your location is on or adjacent to coast of a large land mass or where air masses are influenced by a nearby water body. Improves accuracy for coastal areas by adjusting wind speed and humidity calculations for FAO56 Penman-Monteith calculations.",
+              "solrad_behavior": "Determines how to retrieve or estimate solar radiation for FAO56 evapotranspiration calculations. Choose the method that best matches your available weather data sources.",
+              "forecast_days": "Number of forecast days (0-5) to consider when deciding whether to irrigate. This helps avoid unnecessary watering when rain is predicted. Set to 0 to disable forecast-based irrigation adjustments."
+            }
           },
           "translated-options": {
             "DontEstimate": "Do not estimate",
