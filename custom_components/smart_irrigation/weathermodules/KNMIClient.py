@@ -260,10 +260,11 @@ class KNMIClient:  # pylint: disable=invalid-name
                         )
                         return None
 
-                    # Validate required keys and extract data
+                    # Validate required keys and extract data (with fallbacks for missing data)
+                    missing_keys = []
                     for k in KNMI_required_keys:
                         if k not in latest_data:
-                            self.raiseIOError(k)
+                            missing_keys.append(k)
                         elif k in KNMIValidators:
                             value = latest_data[k]
                             if value is not None and (
@@ -276,6 +277,13 @@ class KNMIClient:  # pylint: disable=invalid-name
                                     KNMIValidators[k]["min"],
                                     KNMIValidators[k]["max"],
                                 )
+                    
+                    # If too many required keys are missing, station data is incomplete
+                    if len(missing_keys) > len(KNMI_required_keys) // 2:  # More than half missing
+                        _LOGGER.warning(
+                            "KNMI station has insufficient data. Missing: %s. Will use fallback values.",
+                            missing_keys
+                        )
 
                     # Convert and store the data (with null checks)
                     wind_speed = latest_data.get(KNMI_wind_speed_key_name)
@@ -293,8 +301,8 @@ class KNMIClient:  # pylint: disable=invalid-name
                     # Calculate current precipitation intensity (mm/h)
                     # KNMI provides ri_regenm_10 as precipitation intensity in mm/h
                     # and dr_regenm_10 as duration of precipitation in seconds within the 10-min period
-                    precip_intensity_mm_h = latest_data.get(KNMI_precip_key_name, 0.0)
-                    precip_duration_sec = latest_data.get(KNMI_precip_duration_key_name, 0.0)
+                    precip_intensity_mm_h = latest_data.get(KNMI_precip_key_name) or 0.0
+                    precip_duration_sec = latest_data.get(KNMI_precip_duration_key_name) or 0.0
 
                     # Use the intensity directly as it's already in mm/h
                     # Only report precipitation if there was actual precipitation duration
@@ -405,8 +413,16 @@ class KNMIClient:  # pylint: disable=invalid-name
 
             values = param_data["values"]
             if values and len(values) > 0:
-                # Get the last (most recent) value
-                latest_data[param_name] = values[-1]
+                # Find the most recent non-None value
+                latest_value = None
+                for value in reversed(values):  # Start from most recent
+                    if value is not None:
+                        latest_value = value
+                        break
+                
+                # Only add to latest_data if we found a non-None value
+                if latest_value is not None:
+                    latest_data[param_name] = latest_value
 
         return latest_data
 
@@ -711,38 +727,160 @@ class KNMIClient:  # pylint: disable=invalid-name
         return sum(values) if values else 0.0
 
     def _find_nearest_station(self, lat, lon):
-        """Find the nearest KNMI weather station to given coordinates."""
+        """Find the best KNMI weather station with required data availability."""
         try:
             stations = self._get_weather_stations()
             if not stations:
                 return None
 
-            min_distance = float("inf")
-            nearest_station = None
+            # Define priority stations known to have complete data (KNMI main stations)
+            # These are the primary KNMI weather stations with comprehensive measurements
+            priority_stations = {
+                "06260",  # De Bilt (KNMI HQ) - most complete data
+                "06240",  # Schiphol - major airport station
+                "06350",  # Gilze-Rijen - southern Netherlands
+                "06280",  # Eelde - northern Netherlands  
+                "06310",  # Vlissingen - southwestern Netherlands
+                "06380",  # Maastricht - southeastern Netherlands
+                "06235",  # Den Helder - northern coastal
+                "06249",  # Berkhout - central Netherlands
+            }
 
+            candidates = []
+            
             for station in stations:
                 station_lat = station["latitude"]
                 station_lon = station["longitude"]
+                station_id = station["id"]
 
-                # Calculate distance using Haversine formula
                 distance = self._calculate_distance(lat, lon, station_lat, station_lon)
+                
+                # Calculate priority score
+                priority_score = 0
+                if station_id in priority_stations:
+                    priority_score = 10  # High priority for main stations
+                
+                # Prefer closer stations but prioritize data availability
+                final_score = priority_score - (distance * 0.1)  # Distance penalty
+                
+                candidates.append({
+                    'station': station,
+                    'distance': distance,
+                    'priority_score': priority_score,
+                    'final_score': final_score,
+                    'is_main_station': station_id in priority_stations
+                })
 
-                if distance < min_distance:
-                    min_distance = distance
-                    nearest_station = station
+            if not candidates:
+                return None
 
-            if nearest_station:
-                _LOGGER.debug(
-                    "Nearest KNMI station: %s (%.2f km away)",
-                    nearest_station["name"],
-                    min_distance,
+            # Sort by final score (priority + distance consideration)
+            candidates.sort(key=lambda x: x['final_score'], reverse=True)
+            
+            # Try to find a main station within reasonable distance first
+            for candidate in candidates[:10]:  # Check top 10 candidates
+                if candidate['is_main_station'] and candidate['distance'] <= 150:  # 150km max for main stations
+                    _LOGGER.info(
+                        "Selected priority KNMI station '%s' (ID: %s) - Distance: %.1f km (main station with complete data)",
+                        candidate['station']['name'], 
+                        candidate['station']['id'], 
+                        candidate['distance']
+                    )
+                    return candidate['station']
+            
+            # Fall back to closest station with data quality testing
+            for candidate in candidates[:5]:  # Test top 5
+                station = candidate['station']
+                distance = candidate['distance']
+                
+                if distance <= 200:  # Maximum 200km for any station
+                    data_quality_score = self._test_station_data_quality(station)
+                    
+                    if data_quality_score >= 3:  # At least 3/5 required parameters
+                        _LOGGER.info(
+                            "Selected KNMI station '%s' (ID: %s) - Distance: %.1f km, Data quality: %d/5",
+                            station['name'], station['id'], distance, data_quality_score
+                        )
+                        return station
+
+            # Last resort: return closest station
+            if candidates:
+                nearest = candidates[0]
+                _LOGGER.warning(
+                    "Using nearest available station '%s' (ID: %s) - Distance: %.1f km (limited data expected)",
+                    nearest['station']['name'], 
+                    nearest['station']['id'], 
+                    nearest['distance']
                 )
+                return nearest['station']
 
-            return nearest_station
+            return None
 
         except Exception as ex:
-            _LOGGER.warning("Could not find nearest KNMI weather station: %s", ex)
+            _LOGGER.warning("Could not find suitable KNMI weather station: %s", ex)
             return None
+
+    def _test_station_data_quality(self, station):
+        """Test how much of the required data a KNMI station actually provides.
+        
+        Returns:
+            int: Score from 0-5 indicating how many required parameters have data
+        """
+        try:
+            # Use station coordinates for testing
+            coords = f"POINT({station['longitude']} {station['latitude']})"
+            
+            # Test recent data (last 6 hours to account for processing delays)
+            end_time = datetime.datetime.now() - datetime.timedelta(hours=3)
+            start_time = end_time - datetime.timedelta(hours=3)
+            datetime_param = f"{start_time.isoformat()}Z/{end_time.isoformat()}Z"
+
+            # Test for required parameters
+            parameter_names = list(KNMI_required_keys)
+            params = {
+                "coords": coords,
+                "datetime": datetime_param,
+                "parameter-name": ",".join(parameter_names),
+                "f": "CoverageJSON",
+            }
+
+            req = requests.get(
+                KNMI_OBSERVATIONS_URL,
+                headers=self.headers,
+                params=params,
+                timeout=15,  # Shorter timeout for testing
+            )
+
+            if req.status_code == 200:
+                doc = json.loads(req.text)
+                if "ranges" in doc and doc["ranges"]:
+                    latest_data = self._get_latest_observation(doc["ranges"])
+                    
+                    # Count how many required parameters have non-None values
+                    data_score = 0
+                    for param in KNMI_required_keys:
+                        if param in latest_data and latest_data[param] is not None:
+                            data_score += 1
+                    
+                    _LOGGER.debug(
+                        "Station %s data quality: %d/5 parameters available (%s)",
+                        station['id'], data_score, 
+                        [k for k in KNMI_required_keys if k in latest_data and latest_data[k] is not None]
+                    )
+                    return data_score
+            
+            _LOGGER.debug(
+                "Station %s data quality test failed: status %s", 
+                station['id'], req.status_code
+            )
+            return 0
+
+        except Exception as ex:
+            _LOGGER.debug(
+                "Could not test data quality for station %s: %s", 
+                station['id'], ex
+            )
+            return 0
 
     def _get_weather_stations(self):
         """Get list of all KNMI weather stations."""
@@ -785,6 +923,94 @@ class KNMIClient:  # pylint: disable=invalid-name
         except Exception as ex:
             _LOGGER.warning("Error getting KNMI weather stations: %s", ex)
             return []
+
+    def _test_station_data_quality(self, station):
+        """Test data quality for a specific station by checking how many required parameters are available.
+        
+        Returns a score from 0-5 based on data availability:
+        - 5: All required parameters available with recent data
+        - 4: Most required parameters (4/5) available
+        - 3: Some required parameters (3/5) available  
+        - 2: Few required parameters (2/5) available
+        - 1: Minimal data (1/5) available
+        - 0: No usable data
+        """
+        try:
+            # Test data from last 2 hours to account for processing delay
+            end_time = datetime.datetime.now() - datetime.timedelta(hours=2)
+            start_time = end_time - datetime.timedelta(hours=1)
+            
+            # Format times for KNMI API
+            datetime_param = f"{start_time.isoformat()}Z/{end_time.isoformat()}Z"
+            
+            # Parameters we need for irrigation calculations
+            test_parameters = [
+                KNMI_temp_key_name,
+                KNMI_wind_speed_key_name, 
+                KNMI_pressure_key_name,
+                KNMI_humidity_key_name,
+                KNMI_dew_point_key_name,
+            ]
+            
+            coords = f"POINT({station['longitude']} {station['latitude']})"
+            
+            params = {
+                "coords": coords,
+                "datetime": datetime_param,
+                "parameter-name": ",".join(test_parameters),
+                "f": "CoverageJSON",
+            }
+            
+            # Quick test request with short timeout
+            req = requests.get(
+                KNMI_OBSERVATIONS_URL,
+                headers=self.headers,
+                params=params,
+                timeout=10,  # Shorter timeout for testing
+            )
+            
+            if req.status_code != 200:
+                _LOGGER.debug("Station %s API test failed: %s", station['id'], req.status_code)
+                return 0
+                
+            doc = json.loads(req.text)
+            
+            if "ranges" not in doc or not doc["ranges"]:
+                _LOGGER.debug("Station %s has no data ranges", station['id'])
+                return 0
+                
+            # Check data availability
+            available_params = 0
+            total_params = len(test_parameters)
+            
+            # Get latest observation and count non-None parameters
+            latest_data = self._get_latest_observation(doc["ranges"])
+            
+            if not latest_data:
+                _LOGGER.debug("Station %s has no recent observations", station['id'])
+                return 0
+                
+            for param in test_parameters:
+                if param in latest_data and latest_data[param] is not None:
+                    available_params += 1
+                    
+            # Calculate score based on availability percentage
+            if available_params == total_params:
+                return 5  # Perfect data
+            elif available_params >= total_params * 0.8:  # 80% or more
+                return 4  # Good data
+            elif available_params >= total_params * 0.6:  # 60% or more
+                return 3  # Acceptable data
+            elif available_params >= total_params * 0.4:  # 40% or more
+                return 2  # Limited data
+            elif available_params > 0:
+                return 1  # Minimal data
+            else:
+                return 0  # No usable data
+                
+        except Exception as ex:
+            _LOGGER.debug("Error testing station %s data quality: %s", station.get('id', 'unknown'), ex)
+            return 0
 
     def _calculate_distance(self, lat1, lon1, lat2, lon2):
         """Calculate distance between two points using Haversine formula (in km)."""

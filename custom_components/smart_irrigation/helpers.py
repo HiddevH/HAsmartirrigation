@@ -592,8 +592,8 @@ def altitudeToPressure(alt):
 async def test_api_key(hass: HomeAssistant, weather_service, api_key):
     """Test access to Weather Service API here."""
     client = None
-    test_lat = 52.353218
-    test_lon = 5.0027695
+    test_lat = 52.0910879  # De Bilt (KNMI headquarters) - better data availability
+    test_lon = 5.1124231
     test_elev = 1
     if weather_service == CONF_WEATHER_SERVICE_OWM:
         client = OWMClient(
