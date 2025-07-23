@@ -267,6 +267,7 @@ class SmartIrrigationCoordinator(DataUpdateCoordinator):
                     latitude=self.hass.config.as_dict().get(CONF_LATITUDE),
                     longitude=self.hass.config.as_dict().get(CONF_LONGITUDE),
                     elevation=self.hass.config.as_dict().get(CONF_ELEVATION),
+                    weerlive_api_key=hass.data[const.DOMAIN].get(const.CONF_WEERLIVE_API_KEY),
                 )
         self._subscriptions = []
 

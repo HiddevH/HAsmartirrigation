@@ -1,104 +1,164 @@
-# KNMI Makkink Enhancement for Netherlands Users 🇳🇱
+# KNMI Weather Integration for Netherlands Users 🇳🇱
 
-## Overview
+## Introduction
 
-Smart Irrigation now provides **enhanced evapotranspiration accuracy for Netherlands users** through professional-grade Makkink calculations from the Royal Netherlands Meteorological Institute (KNMI), with automatic PyETO fallback for reliability.
+The KNMI weather integration provides Netherlands users with enhanced evapotranspiration calculations using professional-grade Makkink reference evapotranspiration data from the Royal Netherlands Meteorological Institute (KNMI). This integration combines the accuracy of official meteorological data with reliable fallback mechanisms to ensure optimal irrigation management.
 
-**Key Benefits:**
+## Key Features
 
-- **Enhanced accuracy**: Climate-specific calculations calibrated for Dutch conditions
-- **Professional grade**: Same data Dutch agricultural professionals use
-- **Automatic fallback**: Uses PyETO when Makkink data unavailable
-- **Zero breaking changes**: Works with existing configurations
+### Enhanced Evapotranspiration Accuracy
 
-## How It Works
+- **Makkink Method**: Uses the same professional-grade evapotranspiration calculations employed by Dutch agricultural professionals
+- **Climate-Specific**: Calibrated specifically for Netherlands climate conditions
+- **Official Data Source**: Direct integration with KNMI's EV24 dataset
 
-The KNMI module intelligently combines two calculation methods:
+### Comprehensive Weather Coverage
 
-1. **Primary**: Fetches yesterday's Makkink ET from KNMI's EV24 dataset (professional meteorological data)
-2. **Fallback**: Uses proven PyETO calculations when Makkink data is unavailable
-3. **Transparent**: Clear logging shows which calculation method is active
+- **Current Observations**: Real-time weather data from KNMI observation stations
+- **Professional ET Data**: Daily Makkink evapotranspiration values with 1-day processing delay
+- **Forecast Integration**: Optional 5-day forecasts via Weerlive.nl API
+- **Intelligent Fallbacks**: Automatic PyETO calculations when Makkink data is unavailable
 
-| Aspect | Makkink (KNMI) | PyETO (Fallback) |
-|--------|----------------|------------------|
-| **Accuracy for Netherlands** | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐ Very Good |
-| **Data source** | KNMI professional data | Real-time weather parameters |
-| **Calibration** | Dutch climate specific | Universal FAO-56 formula |
+### Reliability & Performance
 
-## Setup Guide
+- **Zero Breaking Changes**: Fully compatible with existing Smart Irrigation configurations
+- **Transparent Operation**: Clear logging indicates which data sources and calculation methods are active
+- **Optimized API Usage**: Efficient data retrieval aligned with KNMI's data availability patterns
+
+## Data Sources Comparison
+
+| Data Source | Accuracy for NL | Data Type | Update Frequency | Calibration |
+|-------------|----------------|-----------|------------------|-------------|
+| **KNMI Makkink** | ⭐⭐⭐⭐⭐ | Professional ET | Daily | Netherlands-specific |
+| **KNMI Observations** | ⭐⭐⭐⭐⭐ | Current weather | Real-time | Netherlands stations |
+| **Weerlive.nl Forecasts** | ⭐⭐⭐⭐ | 5-day forecast | Regular updates | Netherlands-focused |
+| **PyETO Fallback** | ⭐⭐⭐⭐ | Calculated ET | Real-time | Universal FAO-56 |
+
+## Installation & Setup
 
 ### Prerequisites
 
-1. **Location**: Netherlands territory
-2. **KNMI API Key**: Get from [KNMI Data Platform](https://dataplatform.knmi.nl/)
-3. **Smart Irrigation**: Latest version with KNMI support
+**Geographic Requirements:**
 
-### Configuration
+- Location within Netherlands territory for optimal KNMI station coverage
 
-#### KNMI Module (Recommended for Netherlands)
+**Required API Keys:**
 
-**Weather Service**: KNMI with your API key  
-**Calculation Module**: KNMI  
-**Sensor Group**: Weather parameters (temperature, wind, pressure, etc.)
+- **KNMI API Key**: Obtain from [KNMI Data Platform](https://dataplatform.knmi.nl/) (required)
+- **Weerlive.nl API Key**: Obtain from [Weerlive.nl](https://weerlive.nl/weerlive_api_v2.php) (optional, for enhanced forecasts)
 
-**Result**: Uses Makkink ET when available, falls back to PyETO when needed.
+**System Requirements:**
 
-#### Alternative Options
+- Smart Irrigation integration with KNMI weather service support
 
-| Module | When to Use | Calculation Method |
-|--------|-------------|-------------------|
-| **PyETO** | Global use, traditional calculations | Always PyETO/Penman-Monteith |
-| **Passthrough** | Use weather service ET directly | Weather service pre-calculated ET |
+### Configuration Steps
 
-## ⚠️ Critical: Optimize Calculation Timing
+#### 1. Basic KNMI Configuration
 
-**The default calculation time (23:00) is suboptimal for KNMI Makkink data.**
+In Smart Irrigation configuration:
 
-### The Problem
+- **Weather Service**: Select "KNMI"
+- **KNMI API Key**: Enter your KNMI Data Platform API key
+- **Calculation Module**: Select "KNMI" for Makkink ET calculations
+- **Sensor Group**: Configure weather parameters (temperature, wind, pressure, humidity, etc.)
 
-- **Evening calculation (23:00)**: Uses day-before-yesterday's Makkink ET
-- **Morning irrigation**: Based on 2-day-old evapotranspiration data
-- **Result**: Poor irrigation timing
+#### 2. Enhanced Forecast Configuration (Optional)
 
-### The Solution
+To enable Netherlands-specific forecasts:
 
-**Change calculation time to early morning (06:00):**
+- **Weerlive.nl API Key**: Enter your Weerlive.nl API key in the optional field
+- Leave blank to use observations-only mode
 
-- **Early morning (06:00)**: Uses yesterday's actual Makkink ET
-- **Irrigation**: Based on previous day's actual plant water loss
-- **Result**: Optimal irrigation timing with fresh data
+#### 3. Calculation Module Options
 
-### Why This Matters
+| Module | Use Case | Calculation Method | Recommended For |
+|--------|----------|-------------------|-----------------|
+| **KNMI** | Netherlands users | Makkink ET + PyETO fallback | Primary choice for NL |
+| **PyETO** | Global usage | Traditional Penman-Monteith | Non-NL locations |
+| **Passthrough** | Direct ET values | Weather service ET | Special configurations |
 
-KNMI provides **daily Makkink values** with a 1-day processing delay:
+### Data Flow & Processing
 
-- Yesterday's data becomes available today
-- Early morning calculations use the freshest relevant data
-- Evening calculations introduce unnecessary data lag
+**Primary Operation Mode:**
 
-### Update Frequency Recommendations
+1. **Weather Observations**: Real-time data from nearest KNMI station
+2. **Makkink ET Retrieval**: Yesterday's professional ET data from EV24 dataset
+3. **Forecast Integration**: 5-day Netherlands weather forecasts (if Weerlive.nl configured)
+4. **Intelligent Processing**: Combines data sources with automatic quality validation
 
-**Daily updates (most efficient)**: Single API call per day  
-**Hourly updates (works but less efficient)**: 24 calls for same daily data
+**Fallback Operation Mode:**
 
-*Note: Smart Irrigation's time multiplier system automatically handles both frequencies correctly, but daily updates are more API-efficient for daily Makkink data.*
+1. **PyETO Calculations**: Standard evapotranspiration calculations using real-time weather data
+2. **Automatic Activation**: Triggered when Makkink data unavailable
+3. **Seamless Transition**: No user intervention required
 
-### 🔧 **Optimal Configuration Sequence**
+## Timing Optimization for Makkink Data
 
-For KNMI Makkink data, the ideal sequence is:
+### Understanding KNMI Data Availability
 
-1. **05:00**: Daily weather data update (fetches yesterday's Makkink ET)
-2. **06:00**: Automatic calculation (uses fresh Makkink data)  
-3. **07:00**: Weather data pruning (clears old data after calculation)
-4. **06:00+**: Irrigation based on yesterday's actual evapotranspiration
+KNMI's Makkink evapotranspiration data follows a specific processing schedule that affects optimal configuration timing:
 
-**Why this timing works:**
+- **Data Processing Delay**: Makkink ET values are calculated and published with a 1-day delay
+- **Availability Pattern**: Yesterday's Makkink data becomes available today
+- **Update Schedule**: New data typically available in early morning hours
 
-- ✅ Fresh Makkink data available at calculation time
-- ✅ Data cleared after calculation to prevent stale data accumulation
-- ✅ 24-hour intervals align with daily Makkink data updates
-- ✅ Morning irrigation with optimal plant water management
+### Timing Configuration Impact
 
-**⚠️ Critical Timing Limitation**: Smart Irrigation only allows configuration of update **frequency** (how often), not update **timing** (when the cycle starts). With 24-hour updates, the first update occurs immediately upon restart, then every 24 hours from that point. This means the update timing relative to your calculation time depends on when Smart Irrigation was last restarted.
+The choice of calculation timing significantly affects data freshness and irrigation accuracy:
 
-**Solution**: To ensure updates occur before calculations, restart Smart Irrigation at your desired update time (e.g., 05:00) to establish the correct 24-hour cycle timing.
+**Suboptimal: Evening Calculations (23:00)**
+
+- Uses day-before-yesterday's Makkink ET data
+- Results in 2-day-old evapotranspiration information
+- Morning irrigation based on outdated plant water loss data
+
+**Optimal: Early Morning Calculations (06:00)**
+
+- Uses yesterday's actual Makkink ET data
+- Provides 1-day-old evapotranspiration information (freshest available)
+- Morning irrigation based on recent plant water loss data
+
+### Recommended Configuration Sequence
+
+For optimal KNMI Makkink data utilization:
+
+1. **05:00** - Weather data update (retrieves yesterday's Makkink ET)
+2. **06:00** - Irrigation calculation (uses fresh Makkink data)
+3. **06:00+** - Irrigation execution (based on yesterday's actual evapotranspiration)
+4. **23:00** - Data cleanup (removes outdated weather data)
+
+### Update Frequency Considerations
+
+#### Daily Updates (Recommended)
+
+- Single API call per day
+- Aligned with KNMI's daily Makkink data release schedule
+- Most efficient use of API resources
+
+#### Hourly Updates (Functional but Inefficient)
+
+- 24 API calls for the same daily Makkink value
+- No data freshness advantage
+- Higher API usage without benefit
+
+### Establishing Correct Timing
+
+To align updates with optimal timing:
+
+1. **Configure Update Time**: Set the daily update time to 05:00 in Smart Irrigation configuration
+2. **Set Update Frequency**: Configure 24-hour (daily) update frequency
+3. **Configure Calculation Time**: Set irrigation calculations to run at 06:00 or later
+4. **Verify Operation**: Monitor logs to confirm Makkink data availability during calculations
+
+The system will automatically update weather data at your configured time each day, ensuring fresh Makkink ET data is available for morning irrigation calculations.
+
+### Implementation Notes
+
+#### Smart Irrigation Timing Control
+
+Smart Irrigation provides precise control over update timing through its configuration interface:
+
+- **Daily Update Time**: Configurable to any time (recommended: 05:00)
+- **Update Frequency**: Set to 24 hours for daily updates
+- **Calculation Timing**: Independent scheduling for irrigation calculations
+- **Automatic Execution**: No manual restarts required

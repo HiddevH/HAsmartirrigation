@@ -22,6 +22,7 @@
         "data": {
           "weather_service": "Weerdienst",
           "weather_service_api_key": "API sleutel",
+          "weerlive_api_key": "Weerlive.nl API sleutel (optioneel, voor KNMI voorspellingen - verkrijgbaar via https://weerlive.nl/weerlive_api_v2.php)",
           "weather_service_api_version": "API versie"
         }
       }
@@ -45,6 +46,7 @@
         "data": {
           "weather_service": "Weerdienst",
           "weather_service_api_key": "API sleutel",
+          "weerlive_api_key": "Weerlive.nl API sleutel (optioneel, voor KNMI voorspellingen - verkrijgbaar via https://weerlive.nl/weerlive_api_v2.php)",
           "weather_service_api_version": "API versie"
         }
       }

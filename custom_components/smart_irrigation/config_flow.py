@@ -69,6 +69,11 @@ class SmartIrrigationConfigFlow(config_entries.ConfigFlow, domain=const.DOMAIN):
                     const.CONF_WEATHER_SERVICE_API_KEY
                 ].strip()
                 self._weather_service = user_input[const.CONF_WEATHER_SERVICE].strip()
+                
+                # Store Weerlive.nl API key if provided (for KNMI forecasts)
+                weerlive_key = user_input.get(const.CONF_WEERLIVE_API_KEY, "").strip()
+                if weerlive_key:
+                    user_input[const.CONF_WEERLIVE_API_KEY] = weerlive_key
                 # v2024.4.5: removing handling of 2.5 API version of sunsetting by OWM in June 2024.
                 # self._owm_api_version = user_input[const.CONF_OWM_API_VERSION]
                 # user_input[const.CONF_FORECASTING_API_VERSION] = "3.0"
@@ -99,6 +104,7 @@ class SmartIrrigationConfigFlow(config_entries.ConfigFlow, domain=const.DOMAIN):
                         {"select": {"options": const.CONF_WEATHER_SERVICES}}
                     ),
                     vol.Required(const.CONF_WEATHER_SERVICE_API_KEY): str,
+                    vol.Optional(const.CONF_WEERLIVE_API_KEY): str,
                     # vol.Required(const.CONF_OWM_API_VERSION, default="3.0"): selector(
                     #    {"select": {"options": ["2.5", "3.0"]}}
                     # ),

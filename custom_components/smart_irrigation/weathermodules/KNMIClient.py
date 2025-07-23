@@ -14,6 +14,8 @@ from ..const import (  # noqa: TID252
     MAPPING_DEWPOINT,
     MAPPING_EVAPOTRANSPIRATION,
     MAPPING_HUMIDITY,
+    MAPPING_MAX_TEMP,
+    MAPPING_MIN_TEMP,
     MAPPING_PRECIPITATION,
     MAPPING_PRESSURE,
     MAPPING_TEMPERATURE,
@@ -33,6 +35,9 @@ KNMI_FORECAST_URL = "https://api.dataplatform.knmi.nl/edr/v1/collections/harmoni
 KNMI_EV24_URL = (
     "https://api.dataplatform.knmi.nl/edr/v1/collections/EV24/cube"
 )
+
+# Weerlive.nl API for forecasts (Netherlands-specific)
+WEERLIVE_FORECAST_URL = "https://weerlive.nl/api/weerlive_api_v2.php"
 
 RETRY_TIMES = 3
 
@@ -91,6 +96,7 @@ class KNMIClient:  # pylint: disable=invalid-name
         elevation,
         cache_seconds=0,
         override_cache=False,
+        weerlive_api_key=None,
     ) -> None:
         """Init."""
         self.api_key = api_key.strip().replace(" ", "")
@@ -106,6 +112,12 @@ class KNMIClient:  # pylint: disable=invalid-name
             "Authorization": f"Bearer {self.api_key}",
             "Accept": "application/json",
         }
+
+        # Weerlive.nl forecast configuration
+        self.weerlive_api_key = weerlive_api_key.strip().replace(" ", "") if weerlive_api_key else None
+        self.enable_weerlive_forecast = bool(self.weerlive_api_key)
+        if self.enable_weerlive_forecast:
+            _LOGGER.info("KNMI enhanced with Weerlive.nl forecasts for Netherlands")
 
         # Initialize cache variables
         self.cache_seconds = cache_seconds
@@ -123,14 +135,21 @@ class KNMIClient:  # pylint: disable=invalid-name
         self.coords = None  # Will be set when station is found
 
     def get_forecast_data(self):
-        """Return forecast data.
+        """Return forecast data from Weerlive.nl if configured.
 
-        Note: KNMI doesn't provide real-time forecast API similar to other weather services.
-        This method returns None to indicate no forecast data is available.
-        Smart Irrigation will fall back to current observations for calculations.
+        KNMI doesn't provide real-time forecast API similar to other weather services.
+        If Weerlive.nl API key is configured, use that for Netherlands-specific forecasts.
+        Otherwise, return None and Smart Irrigation will fall back to current observations.
         """
+        if self.enable_weerlive_forecast:
+            forecast_data = self._get_weerlive_forecast()
+            if forecast_data:
+                return forecast_data
+        
         _LOGGER.warning(
-            "KNMI forecast data not available. Smart Irrigation will use current observations only."
+            "KNMI forecast data not available. %s",
+            "Configure Weerlive.nl API key for enhanced Netherlands forecasts." if not self.enable_weerlive_forecast 
+            else "Smart Irrigation will use current observations only."
         )
         return None
 
@@ -222,9 +241,9 @@ class KNMIClient:  # pylint: disable=invalid-name
 
                 doc = json.loads(req.text)
                 _LOGGER.debug(
-                    "KNMIClient get_data called API %s and received %s",
-                    KNMI_OBSERVATIONS_URL,
-                    doc,
+                    "KNMI API response: status=%s, ranges_keys=%s",
+                    req.status_code,
+                    list(doc.get("ranges", {}).keys()) if "ranges" in doc else "No ranges"
                 )
 
                 # Parse KNMI EDR response
@@ -233,6 +252,7 @@ class KNMIClient:  # pylint: disable=invalid-name
 
                     # Get the most recent data point
                     latest_data = self._get_latest_observation(doc["ranges"])
+                    _LOGGER.debug("Latest observation data keys: %s", list(latest_data.keys()) if latest_data else "None")
 
                     if not latest_data:
                         _LOGGER.warning(
@@ -246,7 +266,7 @@ class KNMIClient:  # pylint: disable=invalid-name
                             self.raiseIOError(k)
                         elif k in KNMIValidators:
                             value = latest_data[k]
-                            if (
+                            if value is not None and (
                                 value < KNMIValidators[k]["min"]
                                 or value > KNMIValidators[k]["max"]
                             ):
@@ -257,19 +277,18 @@ class KNMIClient:  # pylint: disable=invalid-name
                                     KNMIValidators[k]["max"],
                                 )
 
-                    # Convert and store the data
-                    parsed_data[MAPPING_WINDSPEED] = self._convert_wind_speed_to_2m(
-                        latest_data[KNMI_wind_speed_key_name]
-                    )
+                    # Convert and store the data (with null checks)
+                    wind_speed = latest_data.get(KNMI_wind_speed_key_name)
+                    parsed_data[MAPPING_WINDSPEED] = self._convert_wind_speed_to_2m(wind_speed) if wind_speed is not None else 0.0
 
+                    pressure = latest_data.get(KNMI_pressure_key_name)
                     parsed_data[MAPPING_PRESSURE] = self.relative_to_absolute_pressure(
-                        latest_data[KNMI_pressure_key_name],
-                        self.elevation,
-                    )
+                        pressure, self.elevation
+                    ) if pressure is not None else 1013.25  # Standard atmospheric pressure
 
-                    parsed_data[MAPPING_HUMIDITY] = latest_data[KNMI_humidity_key_name]
-                    parsed_data[MAPPING_TEMPERATURE] = latest_data[KNMI_temp_key_name]
-                    parsed_data[MAPPING_DEWPOINT] = latest_data[KNMI_dew_point_key_name]
+                    parsed_data[MAPPING_HUMIDITY] = latest_data.get(KNMI_humidity_key_name, 50.0)  # Default 50%
+                    parsed_data[MAPPING_TEMPERATURE] = latest_data.get(KNMI_temp_key_name, 15.0)  # Default 15°C
+                    parsed_data[MAPPING_DEWPOINT] = latest_data.get(KNMI_dew_point_key_name, 10.0)  # Default 10°C
 
                     # Calculate current precipitation intensity (mm/h)
                     # KNMI provides ri_regenm_10 as precipitation intensity in mm/h
@@ -390,6 +409,183 @@ class KNMIClient:  # pylint: disable=invalid-name
                 latest_data[param_name] = values[-1]
 
         return latest_data
+
+    def _get_weerlive_forecast(self):
+        """Get 5-day forecast from Weerlive.nl (Netherlands-specific)."""
+        # Check cache first
+        if (
+            self._cached_forecast_data is not None
+            and not self.override_cache
+            and datetime.datetime.now()
+            < self._last_time_called + datetime.timedelta(seconds=self.cache_seconds)
+        ):
+            _LOGGER.debug("Returning cached Weerlive.nl forecast data")
+            return self._cached_forecast_data
+        
+        try:
+            params = {
+                'key': self.weerlive_api_key,
+                'locatie': f"{self.latitude},{self.longitude}",
+            }
+            
+            response = requests.get(
+                WEERLIVE_FORECAST_URL, 
+                params=params, 
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Store current conditions for use in forecast parsing
+                if 'liveweer' in data and data['liveweer']:
+                    self._current_conditions = data['liveweer'][0]
+                else:
+                    self._current_conditions = {}
+                
+                forecast_data = self._parse_weerlive_forecast(data)
+                if forecast_data:
+                    # Cache the successful result
+                    self._cached_forecast_data = forecast_data
+                    _LOGGER.info("Using Weerlive.nl forecasts with KNMI observations + Makkink ET (Netherlands enhanced)")
+                    return forecast_data
+                else:
+                    _LOGGER.debug("Weerlive.nl returned valid response but no forecast data could be parsed")
+            else:
+                _LOGGER.debug("Weerlive.nl API returned status code: %s", response.status_code)
+                
+        except Exception as ex:
+            _LOGGER.debug("Weerlive.nl forecast failed: %s", ex)
+        
+        return None
+
+    def _parse_weerlive_forecast(self, data):
+        """Parse Weerlive.nl forecast response into Smart Irrigation format."""
+        try:
+            if not data or 'wk_verw' not in data:
+                _LOGGER.debug("Invalid Weerlive.nl response structure - missing wk_verw")
+                return None
+            
+            forecast_days = []
+            
+            # Weerlive.nl returns forecast in 'wk_verw' array (week forecast)
+            wk_verw_data = data['wk_verw']
+            
+            if not wk_verw_data or not isinstance(wk_verw_data, list):
+                _LOGGER.debug("No forecast data in wk_verw array")
+                return None
+            
+            # Parse each day's forecast
+            for i, day_data in enumerate(wk_verw_data):
+                if day_data:
+                    parsed_day = self._parse_weerlive_day(day_data, f"day_{i}")
+                    if parsed_day:
+                        forecast_days.append(parsed_day)
+            
+            if forecast_days:
+                _LOGGER.debug("Successfully parsed %d forecast days from Weerlive.nl", len(forecast_days))
+                return forecast_days
+            
+        except Exception as ex:
+            _LOGGER.debug("Error parsing Weerlive.nl forecast: %s", ex)
+        
+        return None
+
+    def _parse_weerlive_day(self, day_data, day_key):
+        """Parse a single day's forecast data from Weerlive.nl."""
+        try:
+            parsed_day = {}
+            
+            # Temperature (Celsius) - use max/min from wk_verw
+            max_temp = None
+            min_temp = None
+            
+            if 'max_temp' in day_data and day_data['max_temp'] is not None:
+                max_temp = float(day_data['max_temp'])
+                parsed_day[MAPPING_MAX_TEMP] = max_temp
+            
+            if 'min_temp' in day_data and day_data['min_temp'] is not None:
+                min_temp = float(day_data['min_temp'])
+                parsed_day[MAPPING_MIN_TEMP] = min_temp
+            
+            # Calculate average temperature for main temperature value
+            if max_temp is not None and min_temp is not None:
+                avg_temp = (max_temp + min_temp) / 2
+                parsed_day[MAPPING_TEMPERATURE] = avg_temp
+            elif max_temp is not None:
+                parsed_day[MAPPING_TEMPERATURE] = max_temp
+            elif min_temp is not None:
+                parsed_day[MAPPING_TEMPERATURE] = min_temp
+            
+            # Wind speed (already in m/s in 'windms' field)
+            if 'windms' in day_data and day_data['windms'] is not None:
+                parsed_day[MAPPING_WINDSPEED] = float(day_data['windms'])
+            
+            # Precipitation estimation based on percentage
+            precipitation = 0.0
+            rain_chance = 0.0
+            if 'neersl_perc_dag' in day_data and day_data['neersl_perc_dag'] is not None:
+                try:
+                    rain_chance = float(day_data['neersl_perc_dag'])
+                    # Convert percentage to estimated precipitation amount
+                    if rain_chance >= 80:
+                        precipitation = 8.0  # Heavy rain estimate (8mm)
+                    elif rain_chance >= 60:
+                        precipitation = 4.0  # Moderate rain estimate (4mm)
+                    elif rain_chance >= 40:
+                        precipitation = 2.0  # Light rain estimate (2mm)
+                    elif rain_chance >= 20:
+                        precipitation = 0.5  # Very light rain estimate (0.5mm)
+                    else:
+                        precipitation = 0.0  # No rain
+                except (ValueError, TypeError):
+                    precipitation = 0.0
+                    rain_chance = 0.0
+            
+            parsed_day[MAPPING_PRECIPITATION] = precipitation
+            
+            # For fields not directly available in wk_verw, use reasonable estimates
+            # or get from current conditions in liveweer if available
+            current = getattr(self, '_current_conditions', {})
+            
+            # Humidity - estimate based on weather conditions or use current
+            if 'lv' in current:
+                parsed_day[MAPPING_HUMIDITY] = float(current['lv'])
+            else:
+                # Estimate humidity based on rain chance
+                if rain_chance >= 60:
+                    parsed_day[MAPPING_HUMIDITY] = 85.0  # High humidity with rain
+                elif rain_chance >= 30:
+                    parsed_day[MAPPING_HUMIDITY] = 70.0  # Moderate humidity
+                else:
+                    parsed_day[MAPPING_HUMIDITY] = 60.0  # Lower humidity
+            
+            # Pressure - use current or typical Dutch value
+            if 'luchtd' in current:
+                parsed_day[MAPPING_PRESSURE] = float(current['luchtd'])
+            else:
+                parsed_day[MAPPING_PRESSURE] = 1013.25  # Standard atmospheric pressure
+            
+            # Dew point - calculate from temperature and humidity if possible
+            if MAPPING_TEMPERATURE in parsed_day and MAPPING_HUMIDITY in parsed_day:
+                temp = parsed_day[MAPPING_TEMPERATURE]
+                humidity = parsed_day[MAPPING_HUMIDITY]
+                
+                # Magnus formula for dew point calculation
+                a = 17.27
+                b = 237.7
+                alpha = ((a * temp) / (b + temp)) + math.log(humidity / 100.0)
+                dew_point = (b * alpha) / (a - alpha)
+                parsed_day[MAPPING_DEWPOINT] = dew_point
+            elif 'dauwp' in current:
+                parsed_day[MAPPING_DEWPOINT] = float(current['dauwp'])
+            
+            _LOGGER.debug("Parsed Weerlive.nl day %s: %s", day_key, parsed_day)
+            return parsed_day if parsed_day else None
+            
+        except Exception as ex:
+            _LOGGER.debug("Error parsing Weerlive.nl day %s: %s", day_key, ex)
+            return None
 
     def _get_daily_precipitation(self):
         """Get daily precipitation sum from last 24 hours."""
@@ -624,9 +820,11 @@ class KNMIClient:  # pylint: disable=invalid-name
         )
 
 
-# for testing call: python KNMIClient [api_key] [api_version] [latitude] [longitude] [elevation]
+# for testing call: python KNMIClient [api_key] [api_version] [latitude] [longitude] [elevation] [weerlive_api_key]
+# Weerlive.nl API example: https://weerlive.nl/api/weerlive_api_v2.php?key=demo&locatie=52.0910879,5.1124231
 if __name__ == "__main__":
     args = sys.argv[1:]
-    client = KNMIClient(args[0], args[1], args[2], args[3], args[4])
+    weerlive_key = args[5] if len(args) > 5 else None
+    client = KNMIClient(args[0], args[1], args[2], args[3], args[4], weerlive_api_key=weerlive_key)
     print(client.get_data())  # noqa: T201
     print(client.get_forecast_data())  # noqa: T201
